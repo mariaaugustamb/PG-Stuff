@@ -77,58 +77,62 @@ public:
 	
 	int get_outcode(vec2 point) {
 		int outcode = 0;
-		
+		//Se o y do ponto for maior que o Ymax (imgHeight) setar bit mais significativo para 1
 		if (point.y() > imgHeight)
 			outcode |= TOP;
-		else if (point.y() < 0)
+		else if (point.y() < 0) //Caso seja menor que o Ymin, setar 2 bit mais significativo para 1
 			outcode |= BOTTOM;
-
+		//Se o x do ponto for maior que o Xmax (imgWidth) setar 3 bit mais significativo para 1
 		if (point.x() > imgWidth)
 			outcode |= RIGHT;
-		else if (point.x() < 0)
+		else if (point.x() < 0) //Caso seja menor que o Xmin, setar 4 bit mais significativo para 1
 			outcode |= LEFT;
 		
 		return outcode;
 	}
 
 	bool clip_line(vec2 &p0, vec2 &p1) {
+		//Determinando outcode de p0 e p1 e inicializacao de x_max e y_max
 		int outcode_p0 = get_outcode(p0), outcode_p1 = get_outcode(p1), outcode_external;
 		float x_max = (float)imgWidth, y_max = (float)imgHeight;
 		bool accepted = false;
 		
 		while (!accepted) {
+			//Caso a reta esteja dentro da tela
 			if (outcode_p0 == 0 || outcode_p1 == 0) {
 				accepted = true;
 				break;
+			//Caso a reta nao passe pela tela
 			} else if ((outcode_p0 & outcode_p1) != 0) {
 				break;
-			} else {
+			} else { //Casos em que a reta passa pela tela mas precisa ser cortada
 				float slope, tempX = 0, tempY = 0;
+				//Inclinacao da reta calculada
 				slope = (p1.y() - p0.y()) / (p1.x() - p0.x());
 				outcode_external = (outcode_p0 != 0 ? outcode_p0 : outcode_p1);
-				//Quadrante TOP
+				//Se estiver no quadrante TOP
 				if (outcode_external & TOP) {
 					tempX = p0.x() + (y_max - p0.y())/slope;
 					tempY = y_max;
-				//Quadrante BOTTOM
+				//Se estiver no quadrante BOTTOM
 				} else if (outcode_external & BOTTOM) {
 					tempX = p0.x() + (-p0.y()) / slope;
 					tempY = 0;
-				//Quadrante RIGHT
+				//Se estiver no quadrante RIGHT
 				} else if (outcode_external & RIGHT) {
 					tempX = x_max;
 					tempY = p0.y() + (x_max - p0.x()) * slope;
-				//Quadrante LEFT
+				//Se estiver no quadrante LEFT
 				} else if (outcode_external & LEFT) {
 					tempX = 0;
 					tempY = p0.y() + (-p0.x()) * slope;
 				}
-
+				//Se tivermos editado o p0, atualizar seus valores e recalcular seu outcode
 				if (outcode_external == outcode_p0) {
 					p0[0] = tempX;
 					p0[1] = tempY;
 					outcode_p0 = get_outcode(p0);
-				} else {
+				} else { //Caso contrario editamos p1 e precisamos atualiza-lo
 					p1[0] = tempX;
 					p1[1] = tempY;
 					outcode_p1 = get_outcode(p1);
@@ -140,11 +144,13 @@ public:
 	}
 
 	void draw_line(SDL_Renderer* renderer, vec2 &p0, vec2 &p1) {
+		//Criacao do Vetor Diretor
 		vec2 director = p1 - p0;
+		//Determinando limite de iteracao
 		int range = (int)director.length();
-
+		//Vetor unitario para desenhar cada ponto da reta
 		director.make_unit_vector();
-
+		//Determinando ponto inicial do vetor e em seguida iteracoes para desenhar os pontos da reta
 		vec2 start_point = p0;
 		for (int i = 0; i < range; ++i, start_point += director)
 			SDL_RenderDrawPoint(renderer, start_point.x(), start_point.y());
@@ -171,14 +177,17 @@ public:
 				v3 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[2].pos, praster3);
 
 				if (v1 && v2) {
+					//Se estiver na tela, desenhar a linha
 					if(clip_line(praster1, praster2))
 						draw_line(renderer, praster1, praster2);
 				}
 				if (v1 && v3) {
+					//Se estiver na tela, desenhar a linha
 					if (clip_line(praster1, praster3))
 						draw_line(renderer, praster1, praster3);
 				}
 				if (v2 && v3) {
+					//Se estiver na tela, desenhar a linha
 					if (clip_line(praster2, praster3))
 						draw_line(renderer, praster2, praster3);
 				}
