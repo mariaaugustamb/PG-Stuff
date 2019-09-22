@@ -78,12 +78,12 @@ public:
 	int get_outcode(vec2 point) {
 		int outcode = 0;
 		
-		if (point.y() > imgWidth)
+		if (point.y() > imgHeight)
 			outcode |= TOP;
 		else if (point.y() < 0)
 			outcode |= BOTTOM;
 
-		if (point.x() > imgHeight)
+		if (point.x() > imgWidth)
 			outcode |= RIGHT;
 		else if (point.x() < 0)
 			outcode |= LEFT;

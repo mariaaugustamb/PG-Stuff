@@ -23,8 +23,8 @@ int main(int argc, char* argv[])
 
 			ImGui::CreateContext();
 			ImGuiSDL::Initialize(renderer, WIDTH, HEIGHT);
-
-            camera cam(vec3(0, 0, 4), vec3(0, 0, -1), vec3(0, 1, 0), 90.0f, 1.f, 10000.f, WIDTH, HEIGHT);
+			//Z do from da camera editado para testes, espero que não seja problema
+            camera cam(vec3(0, 0, 2), vec3(0, 0, -1), vec3(0, 1, 0), 90.0f, 1.f, 10000.f, WIDTH, HEIGHT);
 
 			float my_color[4];
 			bool my_tool_active;
