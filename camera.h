@@ -10,6 +10,7 @@
 
 const int WIDTH = 600;
 const int HEIGHT = 400;
+const int LEFT = 1, RIGHT = 2, BOTTOM = 4, TOP = 8;
 
 class camera
 {
@@ -63,11 +64,6 @@ public:
 		worldToCamera.mult_point_matrix(pWorld, pCamera);
 		//Projecao do ponto do Camera Space para Screen Space
 		projectionMatrix.mult_point_matrix(pCamera, pScreen);
-		float dz = _near / pCamera[2];
-		//Homegenizacao do ponto
-		//pScreen[0] *= dz;
-		//pScreen[1] *= dz;
-		//pScreen[2] *= dz;
 		//Normalizacao do ponto para o NDC Space
 		normalizationMatrix.mult_point_matrix(pScreen, pNDC);
 		if (abs(pNDC[0]) > right || abs(pNDC[1]) > top)
@@ -78,6 +74,81 @@ public:
 		//Retornar verdadeiro caso o ponto esteja no mesmo plano da imagem
 		return true;
     }
+	
+	int get_outcode(vec2 point) {
+		int outcode = 0;
+		
+		if (point.y() > imgWidth)
+			outcode |= TOP;
+		else if (point.y() < 0)
+			outcode |= BOTTOM;
+
+		if (point.x() > imgHeight)
+			outcode |= RIGHT;
+		else if (point.x() < 0)
+			outcode |= LEFT;
+		
+		return outcode;
+	}
+
+	bool clip_line(vec2 &p0, vec2 &p1) {
+		int outcode_p0 = get_outcode(p0), outcode_p1 = get_outcode(p1), outcode_external;
+		float x_max = (float)imgWidth, y_max = (float)imgHeight;
+		bool accepted = false;
+		
+		while (!accepted) {
+			if (outcode_p0 == 0 || outcode_p1 == 0) {
+				accepted = true;
+				break;
+			} else if ((outcode_p0 & outcode_p1) != 0) {
+				break;
+			} else {
+				float slope, tempX = 0, tempY = 0;
+				slope = (p1.y() - p0.y()) / (p1.x() - p0.x());
+				outcode_external = (outcode_p0 != 0 ? outcode_p0 : outcode_p1);
+				//Quadrante TOP
+				if (outcode_external & TOP) {
+					tempX = p0.x() + (y_max - p0.y())/slope;
+					tempY = y_max;
+				//Quadrante BOTTOM
+				} else if (outcode_external & BOTTOM) {
+					tempX = p0.x() + (-p0.y()) / slope;
+					tempY = 0;
+				//Quadrante RIGHT
+				} else if (outcode_external & RIGHT) {
+					tempX = x_max;
+					tempY = p0.y() + (x_max - p0.x()) * slope;
+				//Quadrante LEFT
+				} else if (outcode_external & LEFT) {
+					tempX = 0;
+					tempY = p0.y() + (-p0.x()) * slope;
+				}
+
+				if (outcode_external == outcode_p0) {
+					p0[0] = tempX;
+					p0[1] = tempY;
+					outcode_p0 = get_outcode(p0);
+				} else {
+					p1[0] = tempX;
+					p1[1] = tempY;
+					outcode_p1 = get_outcode(p1);
+				}
+			}
+		}
+
+		return accepted;
+	}
+
+	void draw_line(SDL_Renderer* renderer, vec2 &p0, vec2 &p1) {
+		vec2 director = p1 - p0;
+		int range = (int)director.length();
+
+		director.make_unit_vector();
+
+		vec2 start_point = p0;
+		for (int i = 0; i < range; ++i, start_point += director)
+			SDL_RenderDrawPoint(renderer, start_point.x(), start_point.y());
+	}	
 
     void render_scene( std::vector<Obj> objs, SDL_Renderer* renderer) {
 
@@ -85,26 +156,32 @@ public:
         light.make_unit_vector();
 
         for (auto obj : objs){
-            for (int i = 0; i < obj.mesh.tris.size(); i++)
-            {
-                vec2 praster1;
-                vec2 praster2;
-                vec2 praster3;
+			for (int i = 0; i < obj.mesh.tris.size(); i++)
+			{
+				vec2 praster1;
+				vec2 praster2;
+				vec2 praster3;
 
-                vec3 col(255, 255, 255);
-                SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+				vec3 col(255, 255, 255);
+				SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 
-                bool v1, v2, v3;
-                v1 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[0].pos, praster1);
-                v2 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[1].pos, praster2);
-                v3 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[2].pos, praster3);
+				bool v1, v2, v3;
+				v1 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[0].pos, praster1);
+				v2 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[1].pos, praster2);
+				v3 = compute_pixel_coordinates(obj.mesh.tris[i].vertex[2].pos, praster3);
 
-                if(v1 && v2)
-                    SDL_RenderDrawLine(renderer, praster1.x(), praster1.y(), praster2.x(), praster2.y());
-                if(v1 && v3)
-                    SDL_RenderDrawLine(renderer, praster1.x(), praster1.y(), praster3.x(), praster3.y());
-                if(v2 && v3)
-                    SDL_RenderDrawLine(renderer, praster2.x(), praster2.y(), praster3.x(), praster3.y());
+				if (v1 && v2) {
+					if(clip_line(praster1, praster2))
+						draw_line(renderer, praster1, praster2);
+				}
+				if (v1 && v3) {
+					if (clip_line(praster1, praster3))
+						draw_line(renderer, praster1, praster3);
+				}
+				if (v2 && v3) {
+					if (clip_line(praster2, praster3))
+						draw_line(renderer, praster2, praster3);
+				}
             }
         }
     }
